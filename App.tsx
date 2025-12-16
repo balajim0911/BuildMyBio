@@ -98,8 +98,9 @@ const App: React.FC = () => {
     
     setIsDownloading(true);
     
-    // Small delay to ensure any re-renders are complete and give UI feedback
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Increased delay to 800ms to ensure Tailwind CDN styles are fully calculated
+    // before the PDF engine captures the DOM.
+    await new Promise(resolve => setTimeout(resolve, 800));
 
     const element = resumeRef.current;
     
