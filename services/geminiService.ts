@@ -6,8 +6,13 @@ let aiClient: GoogleGenAI | null = null;
 const getGenAIClient = (): GoogleGenAI => {
   if (aiClient) return aiClient;
 
-  // Prioritize import.meta.env for Vite, fallback to process.env
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY;
+  // Prioritize import.meta.env for Vite, fallback to process.env safely
+  let apiKey: string | undefined = import.meta.env.VITE_GEMINI_API_KEY;
+
+  // Safe fallback to process.env if available (for environments where process is defined)
+  if (!apiKey && typeof process !== 'undefined' && process.env) {
+    apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  }
 
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not set. Please check your environment variables.");
