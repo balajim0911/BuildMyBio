@@ -28,11 +28,12 @@ export interface ResumeData {
   skills: string[];
 }
 
-export type TemplateId = 'modern' | 'classic' | 'minimalist';
+export type TemplateId = 'modern' | 'classic' | 'minimalist' | 'creative' | 'executive';
 
 export interface TemplateConfig {
   id: TemplateId;
   name: string;
   primaryColor: string; // User adjustable override
   fontFamily: 'sans' | 'serif' | 'poppins'; // User adjustable override
+  fontSize: number; // User adjustable base font size in pt
 }

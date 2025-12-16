@@ -11,7 +11,9 @@ import {
   Layout, 
   Palette, 
   Type as TypeIcon,
-  Loader2
+  Loader2,
+  Maximize,
+  Minimize
 } from 'lucide-react';
 
 // Declaring html2pdf as it's loaded via CDN
@@ -59,9 +61,11 @@ const templates: { id: TemplateConfig['id']; name: string }[] = [
   { id: 'modern', name: 'Modern Split' },
   { id: 'classic', name: 'Classic Professional' },
   { id: 'minimalist', name: 'Clean Minimalist' },
+  { id: 'creative', name: 'Creative Portfolio' },
+  { id: 'executive', name: 'Executive Suite' },
 ];
 
-const colors = ['#0ea5e9', '#2563eb', '#7c3aed', '#db2777', '#dc2626', '#059669', '#1e293b'];
+const colors = ['#0ea5e9', '#2563eb', '#7c3aed', '#db2777', '#dc2626', '#059669', '#1e293b', '#4b5563', '#000000'];
 const fonts = [
   { id: 'sans', name: 'Inter (Sans)' },
   { id: 'serif', name: 'Merriweather (Serif)' },
@@ -77,6 +81,7 @@ const App: React.FC = () => {
     name: 'Modern Split',
     primaryColor: '#0ea5e9',
     fontFamily: 'sans',
+    fontSize: 10.5, // Default font size in pt
   });
   
   const resumeRef = useRef<HTMLDivElement>(null);
@@ -230,6 +235,62 @@ const App: React.FC = () => {
 
                   <hr className="border-gray-100" />
 
+                   {/* Font Settings */}
+                   <div>
+                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <TypeIcon size={16} /> Typography & Sizing
+                    </h3>
+                    
+                    {/* Font Family */}
+                    <div className="space-y-2 mb-6">
+                      {fonts.map((f) => (
+                        <button
+                          key={f.id}
+                          onClick={() => setTemplateConfig({ ...templateConfig, fontFamily: f.id as any })}
+                          className={`w-full p-3 rounded-lg border text-left transition-all ${
+                            templateConfig.fontFamily === f.id
+                              ? 'border-brand-500 bg-brand-50 text-brand-700'
+                              : 'border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span className={`text-base ${
+                            f.id === 'serif' ? 'font-serif' : f.id === 'poppins' ? 'font-poppins' : 'font-sans'
+                          }`}>
+                            {f.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Font Size Slider */}
+                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                          <Minimize size={14} /> Base Size
+                        </span>
+                        <span className="text-xs font-mono bg-white px-2 py-1 rounded border border-gray-200 text-gray-500">
+                          {templateConfig.fontSize}pt
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="8"
+                        max="14"
+                        step="0.5"
+                        value={templateConfig.fontSize}
+                        onChange={(e) => setTemplateConfig({ ...templateConfig, fontSize: parseFloat(e.target.value) })}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-brand-600"
+                      />
+                      <div className="flex justify-between text-xs text-gray-400 mt-1">
+                        <span>Compact</span>
+                        <span>Normal</span>
+                        <span>Large</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <hr className="border-gray-100" />
+
                   {/* Color Selection */}
                   <div>
                     <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -256,34 +317,6 @@ const App: React.FC = () => {
                            <span className="text-[10px] text-white font-bold">+</span>
                          </div>
                       </div>
-                    </div>
-                  </div>
-
-                  <hr className="border-gray-100" />
-
-                  {/* Font Selection */}
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                      <TypeIcon size={16} /> Typography
-                    </h3>
-                    <div className="space-y-2">
-                      {fonts.map((f) => (
-                        <button
-                          key={f.id}
-                          onClick={() => setTemplateConfig({ ...templateConfig, fontFamily: f.id as any })}
-                          className={`w-full p-3 rounded-lg border text-left transition-all ${
-                            templateConfig.fontFamily === f.id
-                              ? 'border-brand-500 bg-brand-50 text-brand-700'
-                              : 'border-gray-200 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span className={`text-base ${
-                            f.id === 'serif' ? 'font-serif' : f.id === 'poppins' ? 'font-poppins' : 'font-sans'
-                          }`}>
-                            {f.name}
-                          </span>
-                        </button>
-                      ))}
                     </div>
                   </div>
 
