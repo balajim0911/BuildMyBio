@@ -13,11 +13,22 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, config, targetRef }
 
   // Dynamic Styles based on Config
   const primaryColor = config.primaryColor;
-  const fontClass = config.fontFamily === 'serif' 
-    ? 'font-serif' 
-    : config.fontFamily === 'poppins' 
-      ? 'font-poppins' 
-      : 'font-sans';
+  
+  const fontMap: Record<string, string> = {
+    sans: 'font-sans',
+    serif: 'font-serif',
+    poppins: 'font-poppins',
+    lato: 'font-lato',
+    roboto: 'font-roboto',
+    opensans: 'font-opensans',
+    playfair: 'font-playfair',
+    montserrat: 'font-montserrat',
+    oswald: 'font-oswald',
+    raleway: 'font-raleway',
+    lora: 'font-lora',
+  };
+  
+  const fontClass = fontMap[config.fontFamily] || 'font-sans';
 
   // Common container styles for A4
   const containerStyle = {

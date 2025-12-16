@@ -54,7 +54,7 @@ export interface TemplateConfig {
   id: TemplateId;
   name: string;
   primaryColor: string; // User adjustable override
-  fontFamily: 'sans' | 'serif' | 'poppins'; // User adjustable override
+  fontFamily: 'sans' | 'serif' | 'poppins' | 'lato' | 'roboto' | 'opensans' | 'playfair' | 'montserrat' | 'oswald' | 'raleway' | 'lora'; // User adjustable override
   fontSize: number; // User adjustable base font size in pt
 }
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ResumeData, TemplateConfig, ATSEvaluation, TemplateId } from './types';
 import ResumeForm from './components/ResumeForm';
 import ResumePreview from './components/ResumePreview';
@@ -21,7 +21,8 @@ import {
   Upload,
   X,
   Grid,
-  Paintbrush
+  Paintbrush,
+  ChevronDown
 } from 'lucide-react';
 
 // Declaring html2pdf as it's loaded via CDN
@@ -90,9 +91,17 @@ const templates: { id: TemplateId; name: string; category: string }[] = [
 
 const colors = ['#0ea5e9', '#2563eb', '#7c3aed', '#db2777', '#dc2626', '#059669', '#1e293b', '#4b5563', '#000000'];
 const fonts = [
-  { id: 'sans', name: 'Inter (Sans)' },
+  { id: 'sans', name: 'Inter (Standard)' },
   { id: 'serif', name: 'Merriweather (Serif)' },
   { id: 'poppins', name: 'Poppins (Modern)' },
+  { id: 'lato', name: 'Lato (Humanist)' },
+  { id: 'roboto', name: 'Roboto (Geometric)' },
+  { id: 'opensans', name: 'Open Sans (Neutral)' },
+  { id: 'playfair', name: 'Playfair (Elegant)' },
+  { id: 'montserrat', name: 'Montserrat (Clean)' },
+  { id: 'oswald', name: 'Oswald (Strong)' },
+  { id: 'raleway', name: 'Raleway (Stylish)' },
+  { id: 'lora', name: 'Lora (Contemporary)' },
 ];
 
 const App: React.FC = () => {
@@ -118,8 +127,40 @@ const App: React.FC = () => {
   });
   
   const resumeRef = useRef<HTMLDivElement>(null);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [previewScale, setPreviewScale] = useState(0.8);
+
   const [activeTab, setActiveTab] = useState<'editor' | 'design' | 'ats'>('editor');
   const [designSubTab, setDesignSubTab] = useState<'templates' | 'style'>('templates');
+
+  // Effect to calculate dynamic scale based on container width
+  useEffect(() => {
+    const calculateScale = () => {
+      if (previewContainerRef.current) {
+        const containerWidth = previewContainerRef.current.clientWidth;
+        // A4 width in pixels (approx 794px at 96 DPI) + padding margin
+        const a4WidthPx = 794; 
+        const padding = 32; // Reduced padding for better fit
+        
+        const availableWidth = Math.max(containerWidth - padding, 200);
+        
+        // Calculate scale ratio
+        let scale = availableWidth / a4WidthPx;
+        
+        // Clamp scale to reasonable limits
+        scale = Math.min(Math.max(scale, 0.2), 1.5);
+        
+        setPreviewScale(scale);
+      }
+    };
+
+    // Initial calculation
+    calculateScale();
+
+    // Listen for window resize
+    window.addEventListener('resize', calculateScale);
+    return () => window.removeEventListener('resize', calculateScale);
+  }, []);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -421,24 +462,22 @@ const App: React.FC = () => {
                           </h3>
                           
                           <div className="grid grid-cols-1 gap-2 mb-6">
-                            {fonts.map((f) => (
-                              <button
-                                key={f.id}
-                                onClick={() => setTemplateConfig({ ...templateConfig, fontFamily: f.id as any })}
-                                className={`w-full p-3 rounded-lg border text-left transition-all flex justify-between items-center ${
-                                  templateConfig.fontFamily === f.id
-                                    ? 'border-brand-500 bg-brand-50 text-brand-700'
-                                    : 'border-gray-200 hover:bg-gray-50'
-                                }`}
+                            <div className="relative">
+                              <select
+                                value={templateConfig.fontFamily}
+                                onChange={(e) => setTemplateConfig({ ...templateConfig, fontFamily: e.target.value as any })}
+                                className="w-full appearance-none bg-white border border-gray-200 text-gray-700 py-3 px-4 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-brand-500 transition-colors"
                               >
-                                <span className={`text-base ${
-                                  f.id === 'serif' ? 'font-serif' : f.id === 'poppins' ? 'font-poppins' : 'font-sans'
-                                }`}>
-                                  {f.name}
-                                </span>
-                                {templateConfig.fontFamily === f.id && <CheckCircle2 size={16} />}
-                              </button>
-                            ))}
+                                {fonts.map((f) => (
+                                  <option key={f.id} value={f.id}>
+                                    {f.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
+                                <ChevronDown size={16} />
+                              </div>
+                            </div>
                           </div>
 
                           <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -732,8 +771,17 @@ const App: React.FC = () => {
           {/* RIGHT COLUMN: Preview */}
           {/* Conditionally render: Hide if in External ATS Mode */}
           {!isExternalAtsMode && (
-            <div className="lg:col-span-7 bg-gray-200/50 rounded-xl border border-gray-200 p-4 sm:p-8 flex justify-center items-start overflow-auto h-[calc(100vh-8rem)] sticky top-24">
-              <div className="scale-[0.6] sm:scale-[0.7] md:scale-[0.85] lg:scale-[0.9] origin-top transition-transform duration-300 shadow-2xl">
+            <div 
+              ref={previewContainerRef}
+              className="lg:col-span-7 bg-gray-200/50 rounded-xl border border-gray-200 p-4 sm:p-8 flex justify-center items-start overflow-y-auto overflow-x-hidden h-[calc(100vh-8rem)] sticky top-24"
+            >
+              <div 
+                style={{ 
+                  transform: `scale(${previewScale})`,
+                  marginBottom: `-${(1 - previewScale) * 297 * 3.78}px` 
+                }}
+                className="origin-top transition-transform duration-300 shadow-2xl mb-20"
+              >
                 <ResumePreview 
                   data={resumeData} 
                   config={templateConfig} 
