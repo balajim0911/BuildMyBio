@@ -1,10 +1,25 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ResumeData } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Initialize lazily to prevent crash on load if API key is missing
+let ai: GoogleGenAI | null = null;
+const getAIClient = () => {
+  if (!ai) {
+     // Use a dummy key if not present to allow app to load,
+     // but actual requests will fail gracefully later.
+     // Or better: throw if called without key.
+     const key = process.env.API_KEY;
+     if (!key) {
+        throw new Error("Gemini API Key is missing");
+     }
+     ai = new GoogleGenAI({ apiKey: key });
+  }
+  return ai;
+};
 
 export const parseResumeFromText = async (text: string): Promise<Partial<ResumeData>> => {
   try {
+    const client = getAIClient();
     const prompt = `
       You are an expert resume parser. Extract the following information from the provided text into a structured JSON format.
       
@@ -22,7 +37,7 @@ export const parseResumeFromText = async (text: string): Promise<Partial<ResumeD
       Summarize the 'description' for experience into bullet points if it is a paragraph.
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await client.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
       config: {
