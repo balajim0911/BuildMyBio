@@ -6,8 +6,12 @@ let aiInstance: GoogleGenAI | null = null;
 
 const getAI = (): GoogleGenAI => {
   if (!aiInstance) {
-    // Check if API key is available
-    const apiKey = process.env.API_KEY;
+    // Check various environment variable patterns for robustness
+    // Vite uses import.meta.env, but we fallback to process.env just in case
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY ||
+                   import.meta.env.GEMINI_API_KEY ||
+                   (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY || process.env?.API_KEY : undefined);
+
     if (!apiKey) {
       console.warn("Gemini API Key is missing. AI features will not work.");
       // Initialize with a dummy key to prevent immediate crash, but calls will fail
