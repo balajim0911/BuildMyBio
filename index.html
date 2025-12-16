@@ -17,7 +17,7 @@
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Merriweather:wght@300;400;700&family=Poppins:wght@300;400;600&family=Lato:wght@300;400;700&family=Roboto:wght@300;400;700&family=Open+Sans:wght@300;400;700&family=Playfair+Display:wght@400;700&family=Montserrat:wght@300;400;600&family=Oswald:wght@300;400;600&family=Raleway:wght@300;400;600&family=Lora:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Merriweather:wght@300;400;700&family=Poppins:wght@300;400;600&family=Lato:wght@300;400;700&family=Roboto:wght@300;400;700&family=Open+Sans:wght@300;400;700&family=Playfair+Display:wght@400;700&family=Montserrat:wght@300;400;600&family=Oswald:wght@300;400;600&family=Raleway:wght@300;400;600&family=Lora:wght@400;600&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
         theme: {
@@ -44,6 +44,7 @@
               oswald: ['Oswald', 'sans-serif'],
               raleway: ['Raleway', 'sans-serif'],
               lora: ['Lora', 'serif'],
+              caveat: ['Caveat', 'cursive'],
             }
           }
         }
@@ -83,9 +84,19 @@
         }
       }
     </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.561.0"
+  }
+}
+</script>
 </head>
   <body class="bg-gray-50 text-gray-900">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
   </body>
 </html>

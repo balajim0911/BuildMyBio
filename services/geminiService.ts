@@ -1,25 +1,10 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ResumeData, ATSEvaluation } from "../types";
 
-let aiClient: GoogleGenAI | null = null;
-
-const getGenAIClient = (): GoogleGenAI => {
-  if (aiClient) return aiClient;
-
-  // Prioritize import.meta.env for Vite, fallback to process.env
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY;
-
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not set. Please check your environment variables.");
-  }
-
-  aiClient = new GoogleGenAI({ apiKey });
-  return aiClient;
-};
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const parseResumeFromText = async (text: string): Promise<Partial<ResumeData>> => {
   try {
-    const ai = getGenAIClient();
     const prompt = `
       You are an expert resume parser. Extract the following information from the provided text into a structured JSON format.
       
@@ -118,7 +103,6 @@ export const evaluateResumeATS = async (
   jobDescription?: string
 ): Promise<ATSEvaluation> => {
   try {
-    const ai = getGenAIClient();
     const jdContext = jobDescription 
       ? `JOB DESCRIPTION TO MATCH AGAINST:\n"${jobDescription}"\n\nPerform a strict gap analysis between the Resume and this Job Description.` 
       : `NO JOB DESCRIPTION PROVIDED.\nEvaluate based on general ATS best practices for a generic role suitable for this candidate's experience level. Mention in feedback that providing a Job Description would improve accuracy.`;
