@@ -28,7 +28,27 @@ export interface ResumeData {
   skills: string[];
 }
 
-export type TemplateId = 'modern' | 'classic' | 'minimalist' | 'creative' | 'executive';
+export type TemplateId = 
+  | 'modern' 
+  | 'classic' 
+  | 'minimalist' 
+  | 'creative' 
+  | 'executive'
+  | 'corporate'
+  | 'deconstructed'
+  | 'glacial'
+  | 'tignum'
+  | 'vanguard'
+  | 'academic'
+  | 'ivy'
+  | 'quartz'
+  | 'horizon'
+  | 'pillar'
+  | 'blocks'
+  | 'cesta'
+  | 'urban'
+  | 'slate'
+  | 'noble';
 
 export interface TemplateConfig {
   id: TemplateId;
@@ -36,4 +56,9 @@ export interface TemplateConfig {
   primaryColor: string; // User adjustable override
   fontFamily: 'sans' | 'serif' | 'poppins'; // User adjustable override
   fontSize: number; // User adjustable base font size in pt
+}
+
+export interface ATSEvaluation {
+  score: number;
+  feedback: string[];
 }

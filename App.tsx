@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { ResumeData, TemplateConfig } from './types';
+import { ResumeData, TemplateConfig, ATSEvaluation, TemplateId } from './types';
 import ResumeForm from './components/ResumeForm';
 import ResumePreview from './components/ResumePreview';
 import AIBuilder from './components/AIBuilder';
+import { evaluateResumeATS } from './services/geminiService';
 import { 
   FileText, 
   Download, 
@@ -12,8 +13,15 @@ import {
   Palette, 
   Type as TypeIcon,
   Loader2,
-  Maximize,
-  Minimize
+  Minimize,
+  Activity,
+  CheckCircle2,
+  AlertCircle,
+  FileInput,
+  Upload,
+  X,
+  Grid,
+  Paintbrush
 } from 'lucide-react';
 
 // Declaring html2pdf as it's loaded via CDN
@@ -57,12 +65,27 @@ const initialResumeData: ResumeData = {
   skills: ['React', 'TypeScript', 'Node.js', 'Python', 'AWS', 'Docker', 'UI/UX Design'],
 };
 
-const templates: { id: TemplateConfig['id']; name: string }[] = [
-  { id: 'modern', name: 'Modern Split' },
-  { id: 'classic', name: 'Classic Professional' },
-  { id: 'minimalist', name: 'Clean Minimalist' },
-  { id: 'creative', name: 'Creative Portfolio' },
-  { id: 'executive', name: 'Executive Suite' },
+const templates: { id: TemplateId; name: string; category: string }[] = [
+  { id: 'modern', name: 'Modern Split', category: 'Modern' },
+  { id: 'classic', name: 'Classic Professional', category: 'Traditional' },
+  { id: 'minimalist', name: 'Clean Minimalist', category: 'Modern' },
+  { id: 'creative', name: 'Creative Portfolio', category: 'Creative' },
+  { id: 'executive', name: 'Executive Suite', category: 'Traditional' },
+  { id: 'corporate', name: 'Corporate Bold', category: 'Traditional' },
+  { id: 'deconstructed', name: 'Deconstructed', category: 'Modern' },
+  { id: 'glacial', name: 'Glacial', category: 'Modern' },
+  { id: 'tignum', name: 'Tignum', category: 'Creative' },
+  { id: 'vanguard', name: 'Vanguard', category: 'Creative' },
+  { id: 'academic', name: 'Academic', category: 'Traditional' },
+  { id: 'ivy', name: 'Ivy League', category: 'Traditional' },
+  { id: 'quartz', name: 'Quartz', category: 'Professional' },
+  { id: 'horizon', name: 'Horizon', category: 'Professional' },
+  { id: 'pillar', name: 'Pillar', category: 'Modern' },
+  { id: 'blocks', name: 'Blocks', category: 'Professional' },
+  { id: 'cesta', name: 'Cesta', category: 'Elegant' },
+  { id: 'urban', name: 'Urban', category: 'Modern' },
+  { id: 'slate', name: 'Slate', category: 'Bold' },
+  { id: 'noble', name: 'Noble', category: 'Elegant' },
 ];
 
 const colors = ['#0ea5e9', '#2563eb', '#7c3aed', '#db2777', '#dc2626', '#059669', '#1e293b', '#4b5563', '#000000'];
@@ -76,6 +99,16 @@ const App: React.FC = () => {
   const [resumeData, setResumeData] = useState<ResumeData>(initialResumeData);
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [atsEvaluation, setAtsEvaluation] = useState<ATSEvaluation | null>(null);
+  const [jobDescription, setJobDescription] = useState('');
+  
+  // ATS Mode State
+  const [atsMode, setAtsMode] = useState<'builder' | 'external'>('builder');
+  const [externalInputType, setExternalInputType] = useState<'text' | 'file'>('text');
+  const [externalResumeText, setExternalResumeText] = useState('');
+  const [externalFile, setExternalFile] = useState<{name: string, base64: string, mimeType: string} | null>(null);
+
   const [templateConfig, setTemplateConfig] = useState<TemplateConfig>({
     id: 'modern',
     name: 'Modern Split',
@@ -85,17 +118,103 @@ const App: React.FC = () => {
   });
   
   const resumeRef = useRef<HTMLDivElement>(null);
-  const [activeTab, setActiveTab] = useState<'editor' | 'design'>('editor');
+  const [activeTab, setActiveTab] = useState<'editor' | 'design' | 'ats'>('editor');
+  const [designSubTab, setDesignSubTab] = useState<'templates' | 'style'>('templates');
 
-  const handleAIDataParsed = (newData: Partial<ResumeData>) => {
-    setResumeData(prev => ({
-      ...prev,
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (file.type !== 'application/pdf') {
+        alert('Please upload a PDF file.');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+        const base64String = reader.result as string;
+        // remove data:application/pdf;base64, prefix
+        const base64Content = base64String.split(',')[1];
+        setExternalFile({
+            name: file.name,
+            base64: base64Content,
+            mimeType: file.type
+        });
+        setAtsEvaluation(null); // Reset score on new file
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearFile = () => {
+    setExternalFile(null);
+    setAtsEvaluation(null);
+  };
+
+  const handleAnalyzeATS = async (overrideData?: ResumeData) => {
+    setIsAnalyzing(true);
+    setAtsEvaluation(null);
+    try {
+      let payload: ResumeData | string | { base64: string; mimeType: string };
+
+      if (overrideData) {
+        payload = overrideData;
+      } else if (atsMode === 'builder') {
+        payload = resumeData;
+      } else {
+        // External Mode
+        if (externalInputType === 'text') {
+            payload = externalResumeText;
+            if (!payload.trim()) {
+              alert('Please paste resume content to analyze.');
+              setIsAnalyzing(false);
+              return;
+            }
+        } else {
+            // File Mode
+            if (!externalFile) {
+                alert('Please upload a resume PDF.');
+                setIsAnalyzing(false);
+                return;
+            }
+            payload = { base64: externalFile.base64, mimeType: externalFile.mimeType };
+        }
+      }
+
+      const evaluation = await evaluateResumeATS(payload, jobDescription);
+      setAtsEvaluation(evaluation);
+    } catch (error) {
+      console.error("Failed to analyze ATS:", error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleAIDataParsed = async (newData: Partial<ResumeData>) => {
+    const mergedData = {
+      ...resumeData,
       ...newData,
-      personalInfo: { ...prev.personalInfo, ...(newData.personalInfo || {}) },
-      experience: newData.experience || prev.experience,
-      education: newData.education || prev.education,
-      skills: newData.skills || prev.skills,
-    }));
+      personalInfo: { ...resumeData.personalInfo, ...(newData.personalInfo || {}) },
+      experience: newData.experience || resumeData.experience,
+      education: newData.education || resumeData.education,
+      skills: newData.skills || resumeData.skills,
+    };
+    
+    setResumeData(mergedData);
+    
+    // Switch to ATS tab, ensure builder mode, and auto-analyze
+    setActiveTab('ats');
+    setAtsMode('builder');
+    await handleAnalyzeATS(mergedData);
+  };
+
+  const handleJobDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newVal = e.target.value;
+    setJobDescription(newVal);
+    // If user clears the JD, reset the evaluation so the main button reappears
+    // allowing them to run a general health check instead.
+    if (newVal.trim() === '') {
+      setAtsEvaluation(null);
+    }
   };
 
   const downloadPDF = async () => {
@@ -124,6 +243,9 @@ const App: React.FC = () => {
       setIsDownloading(false);
     });
   };
+
+  // Determine if we are in External ATS Mode to adjust layout
+  const isExternalAtsMode = activeTab === 'ats' && atsMode === 'external';
 
   return (
     <div className="min-h-screen flex flex-col font-sans bg-gray-100">
@@ -168,8 +290,9 @@ const App: React.FC = () => {
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
           
-          {/* LEFT COLUMN: Editor & Config */}
-          <div className="lg:col-span-5 flex flex-col h-full gap-6">
+          {/* LEFT COLUMN: Editor & Config & ATS */}
+          {/* Dynamically adjust width based on ATS mode */}
+          <div className={`${isExternalAtsMode ? 'lg:col-span-8 lg:col-start-3' : 'lg:col-span-5'} flex flex-col h-full gap-6 transition-all duration-300`}>
             
             {/* Control Tabs */}
             <div className="bg-white p-1 rounded-xl shadow-sm border border-gray-200 flex">
@@ -181,7 +304,7 @@ const App: React.FC = () => {
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <FileText size={16} /> Content Editor
+                <FileText size={16} /> Content
               </button>
               <button
                 onClick={() => setActiveTab('design')}
@@ -191,12 +314,24 @@ const App: React.FC = () => {
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <Settings size={16} /> Design & Customize
+                <Settings size={16} /> Design
+              </button>
+              <button
+                onClick={() => setActiveTab('ats')}
+                className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                  activeTab === 'ats' 
+                    ? 'bg-brand-50 text-brand-700 shadow-sm' 
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Activity size={16} /> ATS Score
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto pr-1">
-              {activeTab === 'editor' ? (
+              
+              {/* --- EDITOR TAB --- */}
+              {activeTab === 'editor' && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-100 mb-4 sm:hidden">
                     <button 
@@ -208,133 +343,405 @@ const App: React.FC = () => {
                   </div>
                   <ResumeForm data={resumeData} onChange={setResumeData} />
                 </div>
-              ) : (
-                <div className="space-y-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm animate-in fade-in slide-in-from-right-2 duration-300">
+              )}
+
+              {/* --- DESIGN TAB --- */}
+              {activeTab === 'design' && (
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col h-full animate-in fade-in slide-in-from-right-2 duration-300 overflow-hidden">
                   
-                  {/* Template Selection */}
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                      <Layout size={16} /> Select Template
-                    </h3>
-                    <div className="grid grid-cols-1 gap-3">
-                      {templates.map((t) => (
-                        <button
-                          key={t.id}
-                          onClick={() => setTemplateConfig({ ...templateConfig, id: t.id })}
-                          className={`p-3 rounded-lg border-2 text-left transition-all ${
-                            templateConfig.id === t.id
-                              ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500'
-                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span className="font-medium text-gray-800">{t.name}</span>
-                        </button>
-                      ))}
-                    </div>
+                  {/* Design Sub-Tabs */}
+                  <div className="flex border-b border-gray-100">
+                    <button
+                      onClick={() => setDesignSubTab('templates')}
+                      className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${
+                        designSubTab === 'templates' ? 'text-brand-600 bg-brand-50/50 border-b-2 border-brand-600' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                       <Grid size={16} /> Templates
+                    </button>
+                    <button
+                      onClick={() => setDesignSubTab('style')}
+                      className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${
+                        designSubTab === 'style' ? 'text-brand-600 bg-brand-50/50 border-b-2 border-brand-600' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                       <Paintbrush size={16} /> Formatting
+                    </button>
                   </div>
 
-                  <hr className="border-gray-100" />
-
-                   {/* Font Settings */}
-                   <div>
-                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                      <TypeIcon size={16} /> Typography & Sizing
-                    </h3>
+                  <div className="p-6 overflow-y-auto flex-1">
                     
-                    {/* Font Family */}
-                    <div className="space-y-2 mb-6">
-                      {fonts.map((f) => (
-                        <button
-                          key={f.id}
-                          onClick={() => setTemplateConfig({ ...templateConfig, fontFamily: f.id as any })}
-                          className={`w-full p-3 rounded-lg border text-left transition-all ${
-                            templateConfig.fontFamily === f.id
-                              ? 'border-brand-500 bg-brand-50 text-brand-700'
-                              : 'border-gray-200 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span className={`text-base ${
-                            f.id === 'serif' ? 'font-serif' : f.id === 'poppins' ? 'font-poppins' : 'font-sans'
-                          }`}>
-                            {f.name}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
+                    {/* SUB-TAB: TEMPLATES */}
+                    {designSubTab === 'templates' && (
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+                          {templates.map((t) => (
+                            <button
+                              key={t.id}
+                              onClick={() => setTemplateConfig({ ...templateConfig, id: t.id })}
+                              className={`group relative rounded-lg overflow-hidden border-2 transition-all aspect-[210/297] hover:shadow-lg ${
+                                templateConfig.id === t.id
+                                  ? 'border-brand-500 ring-2 ring-brand-200 ring-offset-1'
+                                  : 'border-gray-200 hover:border-brand-300'
+                              }`}
+                            >
+                               {/* Miniature Preview Rendering */}
+                               <div className="absolute inset-0 w-[210mm] h-[297mm] origin-top-left transform scale-[0.12] bg-white pointer-events-none select-none overflow-hidden">
+                                  <ResumePreview 
+                                    data={resumeData} 
+                                    config={{ ...templateConfig, id: t.id }} 
+                                  />
+                               </div>
+                               
+                               {/* Overlay for Name */}
+                               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-2 pt-6 flex flex-col justify-end">
+                                  <span className="text-white text-[9px] font-bold shadow-sm leading-tight text-left truncate">{t.name}</span>
+                                  <span className="text-white/70 text-[8px] text-left truncate">{t.category}</span>
+                               </div>
+                               
+                               {/* Selected Indicator */}
+                               {templateConfig.id === t.id && (
+                                 <div className="absolute top-1.5 right-1.5 bg-brand-500 text-white rounded-full p-0.5 shadow-md">
+                                   <CheckCircle2 size={10} />
+                                 </div>
+                               )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-                    {/* Font Size Slider */}
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                          <Minimize size={14} /> Base Size
-                        </span>
-                        <span className="text-xs font-mono bg-white px-2 py-1 rounded border border-gray-200 text-gray-500">
-                          {templateConfig.fontSize}pt
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min="8"
-                        max="14"
-                        step="0.5"
-                        value={templateConfig.fontSize}
-                        onChange={(e) => setTemplateConfig({ ...templateConfig, fontSize: parseFloat(e.target.value) })}
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-brand-600"
-                      />
-                      <div className="flex justify-between text-xs text-gray-400 mt-1">
-                        <span>Compact</span>
-                        <span>Normal</span>
-                        <span>Large</span>
-                      </div>
-                    </div>
+                    {/* SUB-TAB: STYLE */}
+                    {designSubTab === 'style' && (
+                       <div className="space-y-8">
+                         {/* Font Settings */}
+                         <div>
+                          <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <TypeIcon size={16} /> Typography
+                          </h3>
+                          
+                          <div className="grid grid-cols-1 gap-2 mb-6">
+                            {fonts.map((f) => (
+                              <button
+                                key={f.id}
+                                onClick={() => setTemplateConfig({ ...templateConfig, fontFamily: f.id as any })}
+                                className={`w-full p-3 rounded-lg border text-left transition-all flex justify-between items-center ${
+                                  templateConfig.fontFamily === f.id
+                                    ? 'border-brand-500 bg-brand-50 text-brand-700'
+                                    : 'border-gray-200 hover:bg-gray-50'
+                                }`}
+                              >
+                                <span className={`text-base ${
+                                  f.id === 'serif' ? 'font-serif' : f.id === 'poppins' ? 'font-poppins' : 'font-sans'
+                                }`}>
+                                  {f.name}
+                                </span>
+                                {templateConfig.fontFamily === f.id && <CheckCircle2 size={16} />}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                <Minimize size={14} /> Font Size
+                              </span>
+                              <span className="text-xs font-mono bg-white px-2 py-1 rounded border border-gray-200 text-gray-500">
+                                {templateConfig.fontSize}pt
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min="8"
+                              max="14"
+                              step="0.5"
+                              value={templateConfig.fontSize}
+                              onChange={(e) => setTemplateConfig({ ...templateConfig, fontSize: parseFloat(e.target.value) })}
+                              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-brand-600"
+                            />
+                            <div className="flex justify-between text-xs text-gray-400 mt-1">
+                              <span>Small</span>
+                              <span>Medium</span>
+                              <span>Large</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <hr className="border-gray-100" />
+
+                        {/* Color Selection */}
+                        <div>
+                          <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <Palette size={16} /> Accent Color
+                          </h3>
+                          <div className="flex flex-wrap gap-3">
+                            {colors.map((c) => (
+                              <button
+                                key={c}
+                                onClick={() => setTemplateConfig({ ...templateConfig, primaryColor: c })}
+                                className={`w-10 h-10 rounded-full border-2 transition-transform hover:scale-110 flex items-center justify-center ${
+                                  templateConfig.primaryColor === c ? 'border-gray-400 ring-2 ring-offset-2 ring-gray-300' : 'border-transparent'
+                                }`}
+                                style={{ backgroundColor: c }}
+                              >
+                                {templateConfig.primaryColor === c && <CheckCircle2 size={16} className="text-white drop-shadow-md" />}
+                              </button>
+                            ))}
+                            <div className="relative group w-10 h-10">
+                               <input 
+                                  type="color" 
+                                  className="w-full h-full opacity-0 absolute cursor-pointer z-10"
+                                  onChange={(e) => setTemplateConfig({...templateConfig, primaryColor: e.target.value})}
+                               />
+                               <div className="w-full h-full rounded-full bg-gradient-to-br from-red-500 via-green-500 to-blue-500 border-2 border-gray-200 flex items-center justify-center">
+                                 <span className="text-lg text-white font-bold drop-shadow-md">+</span>
+                               </div>
+                            </div>
+                          </div>
+                        </div>
+                       </div>
+                    )}
+
                   </div>
+                </div>
+              )}
 
-                  <hr className="border-gray-100" />
-
-                  {/* Color Selection */}
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                      <Palette size={16} /> Accent Color
+              {/* --- ATS TAB --- */}
+              {activeTab === 'ats' && (
+                <div className="space-y-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm animate-in fade-in slide-in-from-right-2 duration-300">
+                  <div className="text-center mb-6">
+                    <h3 className="text-lg font-bold text-gray-900 uppercase tracking-wider mb-2 flex items-center justify-center gap-2">
+                      <Activity size={20} className="text-brand-600" /> ATS Compatibility Score
                     </h3>
-                    <div className="flex flex-wrap gap-3">
-                      {colors.map((c) => (
-                        <button
-                          key={c}
-                          onClick={() => setTemplateConfig({ ...templateConfig, primaryColor: c })}
-                          className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${
-                            templateConfig.primaryColor === c ? 'border-gray-400 ring-2 ring-offset-2 ring-gray-300' : 'border-transparent'
-                          }`}
-                          style={{ backgroundColor: c }}
-                        />
-                      ))}
-                      <div className="relative group">
-                         <input 
-                            type="color" 
-                            className="w-8 h-8 opacity-0 absolute cursor-pointer"
-                            onChange={(e) => setTemplateConfig({...templateConfig, primaryColor: e.target.value})}
-                         />
-                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500 via-green-500 to-blue-500 border-2 border-gray-200 flex items-center justify-center">
-                           <span className="text-[10px] text-white font-bold">+</span>
-                         </div>
-                      </div>
-                    </div>
+                    <p className="text-sm text-gray-500">
+                      See how well your resume performs against automated tracking systems.
+                    </p>
                   </div>
 
+                  {/* Mode Toggle */}
+                  <div className="bg-gray-100 p-1 rounded-lg flex mb-6">
+                    <button
+                      onClick={() => { setAtsMode('builder'); setAtsEvaluation(null); }}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${
+                        atsMode === 'builder' 
+                          ? 'bg-white text-brand-700 shadow-sm' 
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      <Layout size={14} /> Builder Resume
+                    </button>
+                    <button
+                      onClick={() => { setAtsMode('external'); setAtsEvaluation(null); }}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${
+                        atsMode === 'external' 
+                          ? 'bg-white text-brand-700 shadow-sm' 
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      <FileInput size={14} /> External Resume
+                    </button>
+                  </div>
+
+                  {/* External Mode Content */}
+                  {atsMode === 'external' && (
+                    <div className="mb-6 animate-in fade-in slide-in-from-top-2 duration-200">
+                      {/* Sub-tabs for Text vs PDF */}
+                      <div className="flex gap-4 mb-4 border-b border-gray-200">
+                         <button
+                           onClick={() => { setExternalInputType('text'); setAtsEvaluation(null); }}
+                           className={`pb-2 text-sm font-medium transition-colors relative ${
+                             externalInputType === 'text' 
+                               ? 'text-brand-600 border-b-2 border-brand-600' 
+                               : 'text-gray-500 hover:text-gray-700'
+                           }`}
+                         >
+                           Paste Text
+                         </button>
+                         <button
+                           onClick={() => { setExternalInputType('file'); setAtsEvaluation(null); }}
+                           className={`pb-2 text-sm font-medium transition-colors relative ${
+                             externalInputType === 'file' 
+                               ? 'text-brand-600 border-b-2 border-brand-600' 
+                               : 'text-gray-500 hover:text-gray-700'
+                           }`}
+                         >
+                           Upload PDF
+                         </button>
+                      </div>
+
+                      {externalInputType === 'text' ? (
+                        <div className="animate-in fade-in duration-200">
+                           <label className="block text-sm font-bold text-gray-700 mb-2">
+                             Resume Content
+                           </label>
+                           <textarea
+                             className="w-full h-48 p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none resize-none text-sm bg-white font-mono"
+                             placeholder="Paste the full text content of your resume here to check its score..."
+                             value={externalResumeText}
+                             onChange={(e) => setExternalResumeText(e.target.value)}
+                           />
+                        </div>
+                      ) : (
+                        <div className="animate-in fade-in duration-200">
+                          <label className="block text-sm font-bold text-gray-700 mb-2">
+                             Resume PDF
+                           </label>
+                           {!externalFile ? (
+                             <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer relative">
+                                <input 
+                                  type="file" 
+                                  accept="application/pdf"
+                                  onChange={handleFileUpload}
+                                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                />
+                                <div className="flex flex-col items-center gap-2 text-gray-500">
+                                   <Upload size={32} className="text-gray-400" />
+                                   <span className="font-medium text-gray-700">Click to upload PDF</span>
+                                   <span className="text-xs">Supported format: .pdf</span>
+                                </div>
+                             </div>
+                           ) : (
+                             <div className="flex items-center justify-between p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                   <div className="p-2 bg-blue-100 rounded text-blue-600">
+                                     <FileText size={20} />
+                                   </div>
+                                   <div>
+                                     <p className="text-sm font-bold text-gray-800">{externalFile.name}</p>
+                                     <p className="text-xs text-gray-500">PDF Document</p>
+                                   </div>
+                                </div>
+                                <button 
+                                  onClick={clearFile}
+                                  className="p-1 hover:bg-blue-100 rounded-full text-gray-500 hover:text-red-500 transition-colors"
+                                >
+                                  <X size={18} />
+                                </button>
+                             </div>
+                           )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Job Description Input */}
+                  <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-100">
+                    <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center justify-between">
+                      <span>Target Job Description</span>
+                      <span className="text-xs font-normal text-gray-500 bg-white px-2 py-0.5 rounded border border-gray-200">Optional</span>
+                    </label>
+                    <textarea
+                      className="w-full h-32 p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none resize-none text-sm bg-white"
+                      placeholder="Paste the job description here to check keyword matching and relevance (Recommended for accurate scoring)..."
+                      value={jobDescription}
+                      onChange={handleJobDescriptionChange}
+                    />
+                    <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                       <CheckCircle2 size={12} className="text-green-600"/> 
+                       Adding a JD enables keyword, skills, and experience gap analysis.
+                    </p>
+                  </div>
+
+                  {!atsEvaluation && !isAnalyzing && (
+                      <div className="text-center py-2">
+                          <button 
+                              onClick={() => handleAnalyzeATS()}
+                              className="bg-brand-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/30 w-full sm:w-auto"
+                          >
+                              {jobDescription.trim() ? 'Analyze Against JD' : 'Analyze General Health'}
+                          </button>
+                      </div>
+                  )}
+
+                  {isAnalyzing && (
+                      <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                          <Loader2 size={40} className="animate-spin mb-4 text-brand-500" />
+                          <p>Scanning resume against criteria...</p>
+                      </div>
+                  )}
+
+                  {atsEvaluation && !isAnalyzing && (
+                      <>
+                          {/* Score Gauge */}
+                          <div className="relative w-48 h-48 mx-auto mb-8">
+                             {/* SVG Gauge Implementation */}
+                             <svg className="w-full h-full" viewBox="0 0 36 36">
+                                <path
+                                  className="text-gray-100"
+                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="3"
+                                />
+                                <path
+                                  className={`${
+                                      atsEvaluation.score >= 75 ? 'text-green-500' : 
+                                      atsEvaluation.score >= 50 ? 'text-yellow-500' : 'text-red-500'
+                                  }`}
+                                  strokeDasharray={`${atsEvaluation.score}, 100`}
+                                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="3"
+                                  strokeLinecap="round"
+                                />
+                             </svg>
+                             <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                <span className={`text-4xl font-bold ${
+                                      atsEvaluation.score >= 75 ? 'text-green-600' : 
+                                      atsEvaluation.score >= 50 ? 'text-yellow-600' : 'text-red-600'
+                                }`}>
+                                    {atsEvaluation.score}
+                                </span>
+                                <span className="text-xs uppercase font-bold text-gray-400">Score</span>
+                             </div>
+                          </div>
+
+                          {/* Feedback List */}
+                          <div>
+                              <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                  <Sparkles size={16} className="text-yellow-500" /> AI Feedback
+                              </h4>
+                              <div className="space-y-3">
+                                  {atsEvaluation.feedback.map((item, i) => (
+                                      <div key={i} className="flex gap-3 items-start p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                          {atsEvaluation.score >= 75 ? (
+                                              <CheckCircle2 size={18} className="text-green-500 shrink-0 mt-0.5" />
+                                          ) : (
+                                              <AlertCircle size={18} className="text-yellow-500 shrink-0 mt-0.5" />
+                                          )}
+                                          <p className="text-sm text-gray-700">{item}</p>
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+                          
+                          <button 
+                              onClick={() => handleAnalyzeATS()}
+                              className="w-full mt-6 py-2 text-sm text-gray-500 hover:text-gray-900 underline"
+                          >
+                              Refresh Analysis
+                          </button>
+                      </>
+                  )}
                 </div>
               )}
             </div>
           </div>
 
           {/* RIGHT COLUMN: Preview */}
-          <div className="lg:col-span-7 bg-gray-200/50 rounded-xl border border-gray-200 p-4 sm:p-8 flex justify-center items-start overflow-auto h-[calc(100vh-8rem)] sticky top-24">
-            <div className="scale-[0.6] sm:scale-[0.7] md:scale-[0.85] lg:scale-[0.9] origin-top transition-transform duration-300 shadow-2xl">
-              <ResumePreview 
-                data={resumeData} 
-                config={templateConfig} 
-                targetRef={resumeRef}
-              />
+          {/* Conditionally render: Hide if in External ATS Mode */}
+          {!isExternalAtsMode && (
+            <div className="lg:col-span-7 bg-gray-200/50 rounded-xl border border-gray-200 p-4 sm:p-8 flex justify-center items-start overflow-auto h-[calc(100vh-8rem)] sticky top-24">
+              <div className="scale-[0.6] sm:scale-[0.7] md:scale-[0.85] lg:scale-[0.9] origin-top transition-transform duration-300 shadow-2xl">
+                <ResumePreview 
+                  data={resumeData} 
+                  config={templateConfig} 
+                  targetRef={resumeRef}
+                />
+              </div>
             </div>
-          </div>
+          )}
 
         </div>
       </main>
