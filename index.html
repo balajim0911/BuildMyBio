@@ -14,10 +14,48 @@
         }
         originalWarn.apply(console, args);
       };
+
+      // Global error handler for debugging white screen issues
+      window.onerror = function(message, source, lineno, colno, error) {
+        const errorContainer = document.createElement('div');
+        errorContainer.style.position = 'fixed';
+        errorContainer.style.top = '0';
+        errorContainer.style.left = '0';
+        errorContainer.style.width = '100%';
+        errorContainer.style.backgroundColor = '#fee2e2';
+        errorContainer.style.borderBottom = '1px solid #ef4444';
+        errorContainer.style.color = '#b91c1c';
+        errorContainer.style.padding = '1rem';
+        errorContainer.style.zIndex = '9999';
+        errorContainer.style.fontFamily = 'monospace';
+        errorContainer.style.whiteSpace = 'pre-wrap';
+        errorContainer.innerText = `Error: ${message}\nAt: ${source}:${lineno}:${colno}\n${error?.stack || ''}`;
+        document.body.prepend(errorContainer);
+        console.error('Caught by window.onerror:', message, error);
+      };
+
+      // Catch unhandled promise rejections
+      window.onunhandledrejection = function(event) {
+        const errorContainer = document.createElement('div');
+        errorContainer.style.position = 'fixed';
+        errorContainer.style.top = '0';
+        errorContainer.style.left = '0';
+        errorContainer.style.width = '100%';
+        errorContainer.style.backgroundColor = '#fee2e2';
+        errorContainer.style.borderBottom = '1px solid #ef4444';
+        errorContainer.style.color = '#b91c1c';
+        errorContainer.style.padding = '1rem';
+        errorContainer.style.zIndex = '9999';
+        errorContainer.style.fontFamily = 'monospace';
+        errorContainer.style.whiteSpace = 'pre-wrap';
+        errorContainer.innerText = `Unhandled Promise Rejection: ${event.reason}`;
+        document.body.prepend(errorContainer);
+        console.error('Caught by onunhandledrejection:', event.reason);
+      };
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Merriweather:wght@300;400;700&family=Poppins:wght@300;400;600&family=Lato:wght@300;400;700&family=Roboto:wght@300;400;700&family=Open+Sans:wght@300;400;700&family=Playfair+Display:wght@400;700&family=Montserrat:wght@300;400;600&family=Oswald:wght@300;400;600&family=Raleway:wght@300;400;600&family=Lora:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Merriweather:wght@300;400;700&family=Poppins:wght@300;400;600&family=Lato:wght@300;400;700&family=Roboto:wght@300;400;700&family=Open+Sans:wght@300;400;700&family=Playfair+Display:wght@400;700&family=Montserrat:wght@300;400;600&family=Oswald:wght@300;400;600&family=Raleway:wght@300;400;600&family=Lora:wght@400;600&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
         theme: {
@@ -44,6 +82,7 @@
               oswald: ['Oswald', 'sans-serif'],
               raleway: ['Raleway', 'sans-serif'],
               lora: ['Lora', 'serif'],
+              caveat: ['Caveat', 'cursive'],
             }
           }
         }
@@ -83,19 +122,17 @@
         }
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.561.0"
-  }
-}
-</script>
 </head>
   <body class="bg-gray-50 text-gray-900">
-    <div id="root"></div>
+    <div id="root" style="min-height: 100vh; display: flex; align-items: center; justify-content: center;">
+      <div style="text-align: center; color: #6b7280; font-family: sans-serif;">
+        <svg class="animate-spin" style="margin: 0 auto 1rem; width: 2rem; height: 2rem; color: #0ea5e9;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p>Loading application...</p>
+      </div>
+    </div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>

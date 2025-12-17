@@ -3,6 +3,7 @@ import { ResumeData, TemplateConfig, ATSEvaluation, TemplateId } from './types';
 import ResumeForm from './components/ResumeForm';
 import ResumePreview from './components/ResumePreview';
 import AIBuilder from './components/AIBuilder';
+import Logo from './components/Logo';
 import { evaluateResumeATS } from './services/geminiService';
 import { 
   FileText, 
@@ -293,11 +294,14 @@ const App: React.FC = () => {
       {/* Navbar */}
       <nav className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="bg-brand-600 p-2 rounded text-white">
-              <FileText size={20} />
+          <div className="flex items-center gap-0 group cursor-pointer">
+            <div className="flex-shrink-0 transition-transform group-hover:scale-105 duration-300">
+               <Logo className="h-12 w-auto" />
             </div>
-            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-600 to-purple-600">
+            <h1
+              className="text-4xl font-caveat font-bold pt-2 tracking-wide -rotate-2 -ml-4"
+              style={{ color: '#4A657D' }}
+            >
               BuildMyBio
             </h1>
           </div>
