@@ -14,6 +14,42 @@
         }
         originalWarn.apply(console, args);
       };
+
+      // Global error handler for debugging white screen issues
+      window.onerror = function(message, source, lineno, colno, error) {
+        const errorContainer = document.createElement('div');
+        errorContainer.style.position = 'fixed';
+        errorContainer.style.top = '0';
+        errorContainer.style.left = '0';
+        errorContainer.style.width = '100%';
+        errorContainer.style.backgroundColor = '#fee2e2';
+        errorContainer.style.borderBottom = '1px solid #ef4444';
+        errorContainer.style.color = '#b91c1c';
+        errorContainer.style.padding = '1rem';
+        errorContainer.style.zIndex = '9999';
+        errorContainer.style.fontFamily = 'monospace';
+        errorContainer.innerText = `Error: ${message}\nAt: ${source}:${lineno}:${colno}\n${error?.stack || ''}`;
+        document.body.prepend(errorContainer);
+        console.error('Caught by window.onerror:', message, error);
+      };
+
+      // Catch unhandled promise rejections
+      window.onunhandledrejection = function(event) {
+        const errorContainer = document.createElement('div');
+        errorContainer.style.position = 'fixed';
+        errorContainer.style.top = '0';
+        errorContainer.style.left = '0';
+        errorContainer.style.width = '100%';
+        errorContainer.style.backgroundColor = '#fee2e2';
+        errorContainer.style.borderBottom = '1px solid #ef4444';
+        errorContainer.style.color = '#b91c1c';
+        errorContainer.style.padding = '1rem';
+        errorContainer.style.zIndex = '9999';
+        errorContainer.style.fontFamily = 'monospace';
+        errorContainer.innerText = `Unhandled Promise Rejection: ${event.reason}`;
+        document.body.prepend(errorContainer);
+        console.error('Caught by onunhandledrejection:', event.reason);
+      };
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
