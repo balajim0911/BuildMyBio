@@ -111,6 +111,7 @@ const App: React.FC = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [atsEvaluation, setAtsEvaluation] = useState<ATSEvaluation | null>(null);
+  const [atsError, setAtsError] = useState<string | null>(null);
   const [jobDescription, setJobDescription] = useState('');
   
   // ATS Mode State
@@ -190,11 +191,13 @@ const App: React.FC = () => {
   const clearFile = () => {
     setExternalFile(null);
     setAtsEvaluation(null);
+    setAtsError(null);
   };
 
   const handleAnalyzeATS = async (overrideData?: ResumeData) => {
     setIsAnalyzing(true);
     setAtsEvaluation(null);
+    setAtsError(null);
     try {
       let payload: ResumeData | string | { base64: string; mimeType: string };
 
@@ -226,6 +229,7 @@ const App: React.FC = () => {
       setAtsEvaluation(evaluation);
     } catch (error) {
       console.error("Failed to analyze ATS:", error);
+      setAtsError("Failed to analyze resume. Please check your API key and try again.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -684,6 +688,16 @@ const App: React.FC = () => {
                        Adding a JD enables keyword, skills, and experience gap analysis.
                     </p>
                   </div>
+
+                  {atsError && (
+                    <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200 flex items-start gap-3">
+                      <AlertCircle size={20} className="shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-bold text-sm">Analysis Failed</p>
+                        <p className="text-sm">{atsError}</p>
+                      </div>
+                    </div>
+                  )}
 
                   {!atsEvaluation && !isAnalyzing && (
                       <div className="text-center py-2">
