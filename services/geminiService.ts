@@ -5,7 +5,10 @@ let aiClient: GoogleGenAI | null = null;
 
 const getAiClient = () => {
   if (!aiClient) {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : undefined);
+    // Safely access import.meta.env
+    const viteEnv = (import.meta as any).env;
+    const apiKey = (viteEnv?.VITE_GEMINI_API_KEY) || (typeof process !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : undefined);
+
     if (!apiKey) {
       console.warn("VITE_GEMINI_API_KEY is not set. AI features will fail.");
     }
@@ -35,7 +38,7 @@ export const parseResumeFromText = async (text: string): Promise<Partial<ResumeD
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -198,7 +201,7 @@ export const evaluateResumeATS = async (
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
       contents: { parts },
       config: {
         responseMimeType: "application/json",
