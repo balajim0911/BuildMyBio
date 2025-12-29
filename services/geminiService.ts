@@ -2,10 +2,28 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ResumeData, ATSEvaluation } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Initialize lazily to avoid crash if env var is missing during module load
+let genAIClient: GoogleGenAI | null = null;
+
+const getClient = () => {
+  if (genAIClient) return genAIClient;
+
+  // Prioritize import.meta.env for Vite, then fallback to process.env
+  // Using explicit type casting and optional chaining to be safe
+  const apiKey = (import.meta as any).env?.GEMINI_API_KEY ||
+                 (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : undefined);
+
+  if (!apiKey) {
+      throw new Error("GEMINI_API_KEY is not set. Please set it in your environment variables (.env file).");
+  }
+
+  genAIClient = new GoogleGenAI({ apiKey });
+  return genAIClient;
+};
 
 export const parseResumeFromText = async (text: string): Promise<Partial<ResumeData>> => {
   try {
+    const ai = getClient();
     const prompt = `
       You are an expert resume parser. Extract the following information from the provided text into a structured JSON format.
       
@@ -23,9 +41,10 @@ export const parseResumeFromText = async (text: string): Promise<Partial<ResumeD
       Summarize the 'description' for experience into bullet points if it is a paragraph.
     `;
 
-    // Using gemini-3-flash-preview for basic extraction tasks as recommended by guidelines
+    // Using gemini-1.5-flash for basic extraction tasks as recommended by guidelines
+    // Reverting to 1.5-flash as 3-flash-preview might be unstable or not available in all tiers
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -186,9 +205,11 @@ export const evaluateResumeATS = async (
         parts.push({ text: `RESUME DATA (JSON):\n${JSON.stringify(data)}` });
     }
 
-    // Using gemini-3-pro-preview for complex text tasks involving advanced reasoning as recommended
+    const ai = getClient();
+    // Using gemini-1.5-flash for complex text tasks involving advanced reasoning as recommended
+    // Reverting to 1.5-flash for stability
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-1.5-flash",
       contents: { parts },
       config: {
         responseMimeType: "application/json",
