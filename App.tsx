@@ -206,7 +206,8 @@ const App: React.FC = () => {
         // External Mode
         if (externalInputType === 'text') {
             payload = externalResumeText;
-            if (!payload.trim()) {
+            // Accessing externalResumeText.trim() directly to avoid TS error with union type 'payload'
+            if (!externalResumeText.trim()) {
               alert('Please paste resume content to analyze.');
               setIsAnalyzing(false);
               return;

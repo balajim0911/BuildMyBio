@@ -1,25 +1,11 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { ResumeData, ATSEvaluation } from "../types";
 
-let aiClient: GoogleGenAI | null = null;
-
-const getAiClient = () => {
-  if (!aiClient) {
-    // Safely access import.meta.env
-    const viteEnv = (import.meta as any).env;
-    const apiKey = (viteEnv?.VITE_GEMINI_API_KEY) || (typeof process !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : undefined);
-
-    if (!apiKey) {
-      console.warn("VITE_GEMINI_API_KEY is not set. AI features will fail.");
-    }
-    aiClient = new GoogleGenAI({ apiKey: apiKey || '' });
-  }
-  return aiClient;
-};
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const parseResumeFromText = async (text: string): Promise<Partial<ResumeData>> => {
   try {
-    const ai = getAiClient();
     const prompt = `
       You are an expert resume parser. Extract the following information from the provided text into a structured JSON format.
       
@@ -37,8 +23,9 @@ export const parseResumeFromText = async (text: string): Promise<Partial<ResumeD
       Summarize the 'description' for experience into bullet points if it is a paragraph.
     `;
 
+    // Using gemini-3-flash-preview for basic extraction tasks as recommended by guidelines
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -118,7 +105,6 @@ export const evaluateResumeATS = async (
   jobDescription?: string
 ): Promise<ATSEvaluation> => {
   try {
-    const ai = getAiClient();
     const jdContext = jobDescription 
       ? `JOB DESCRIPTION TO MATCH AGAINST:\n"${jobDescription}"\n\nPerform a strict gap analysis between the Resume and this Job Description.` 
       : `NO JOB DESCRIPTION PROVIDED.\nEvaluate based on general ATS best practices for a generic role suitable for this candidate's experience level. Mention in feedback that providing a Job Description would improve accuracy.`;
@@ -200,8 +186,9 @@ export const evaluateResumeATS = async (
         parts.push({ text: `RESUME DATA (JSON):\n${JSON.stringify(data)}` });
     }
 
+    // Using gemini-3-pro-preview for complex text tasks involving advanced reasoning as recommended
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-3-pro-preview",
       contents: { parts },
       config: {
         responseMimeType: "application/json",

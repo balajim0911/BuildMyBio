@@ -40,7 +40,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, config, targetRef }
   };
 
   // Helper for rendering skills
-  const SkillPill = ({ skill, style }: { skill: string, style?: React.CSSProperties }) => (
+  const SkillPill = ({ skill, style }: { skill: string, style?: React.CSSProperties, key?: React.Key }) => (
     <span className="inline-block px-2 py-1 rounded text-[0.9em] mr-2 mb-2" style={style}>
       {skill}
     </span>

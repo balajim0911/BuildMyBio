@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ResumeData, Experience, Education } from '../types';
 import { Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -9,6 +9,22 @@ interface ResumeFormProps {
 
 const ResumeForm: React.FC<ResumeFormProps> = ({ data, onChange }) => {
   const [activeSection, setActiveSection] = React.useState<string | null>('personal');
+  
+  // Local state for skills to prevent cursor jumping/stripping while typing
+  const [skillsDraft, setSkillsDraft] = useState(data.skills.join(', '));
+
+  // Update local draft if data.skills changes from outside (e.g. AI Builder)
+  useEffect(() => {
+    const formattedSkills = data.skills.join(', ');
+    // We only update if the normalized content is actually different to avoid
+    // overwriting the user's current typing session (with its trailing commas/spaces)
+    const normalizedDraft = skillsDraft.split(',').map(s => s.trim()).filter(s => s !== '').join(', ');
+    const normalizedData = data.skills.join(', ');
+    
+    if (normalizedDraft !== normalizedData) {
+      setSkillsDraft(formattedSkills);
+    }
+  }, [data.skills]);
 
   const updatePersonalInfo = (field: keyof ResumeData['personalInfo'], value: string) => {
     onChange({
@@ -61,8 +77,10 @@ const ResumeForm: React.FC<ResumeFormProps> = ({ data, onChange }) => {
     onChange({ ...data, education: data.education.filter((e) => e.id !== id) });
   };
 
-  const updateSkills = (value: string) => {
-    // Split by comma and filter empty
+  const handleSkillsChange = (value: string) => {
+    setSkillsDraft(value);
+    // Sync with parent as an array, but be less aggressive about empty strings
+    // to allow the user to finish typing their next skill.
     const skillsArray = value.split(',').map(s => s.trim()).filter(s => s !== '');
     onChange({ ...data, skills: skillsArray });
   };
@@ -262,8 +280,8 @@ const ResumeForm: React.FC<ResumeFormProps> = ({ data, onChange }) => {
             <textarea
               placeholder="Java, React, Team Leadership, Project Management..."
               className={`${inputClasses} h-24`}
-              value={data.skills.join(', ')}
-              onChange={(e) => updateSkills(e.target.value)}
+              value={skillsDraft}
+              onChange={(e) => handleSkillsChange(e.target.value)}
             />
           </div>
         )}
